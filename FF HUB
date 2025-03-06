@@ -1,0 +1,90 @@
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local autoKillEnabled = false
+local guiVisible = true
+
+-- UI Creation
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 100)
+Frame.Position = UDim2.new(0.5, -100, 0.1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Frame.Parent = ScreenGui
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, 0, 1, 0)
+ToggleButton.Text = "Auto Kill: OFF"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleButton.Parent = Frame
+
+-- ค้นหามอนสเตอร์ที่ใกล้ที่สุด
+function findNearestMob()
+    local nearestMob = nil
+    local shortestDistance = math.huge
+
+    for _, mob in pairs(workspace.Enemies:GetChildren()) do
+        if mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+            local distance = (mob.HumanoidRootPart.Position - rootPart.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                nearestMob = mob
+            end
+        end
+    end
+    return nearestMob
+end
+
+-- เทเลพอร์ตไปหามอนสเตอร์แบบนุ่มนวล
+function smoothTeleport(targetPos, speed)
+    local tweenInfo = TweenInfo.new(speed, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = CFrame.new(targetPos)})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- ฆ่ามอนสเตอร์อัตโนมัติ (One Hit Kill)
+function autoKill()
+    while autoKillEnabled do
+        local mob = findNearestMob()
+        if mob then
+            smoothTeleport(mob.HumanoidRootPart.Position + Vector3.new(0, 3, 0), 1.2) -- เทเลพอร์ตไปหามอน
+            wait(0.5) -- รอให้ตัวละครเซ็ตตำแหน่ง
+            if mob:FindFirstChild("Humanoid") then
+                mob.Humanoid.Health = 0 -- ฆ่ามอนโดยตรง
+            end
+        else
+            wait(1) -- ถ้าไม่มีมอนสเตอร์ให้รอ
+        end
+    end
+end
+
+-- ปุ่มเปิด/ปิด Auto Kill
+ToggleButton.MouseButton1Click:Connect(function()
+    autoKillEnabled = not autoKillEnabled
+    if autoKillEnabled then
+        ToggleButton.Text = "Auto Kill: ON"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        autoKill()
+    else
+        ToggleButton.Text = "Auto Kill: OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+-- ฟังก์ชันเปิด/ปิด GUI ด้วยปุ่ม "F"
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.p then
+        guiVisible = not guiVisible
+        ScreenGui.Enabled = guiVisible
+    end
+end)
